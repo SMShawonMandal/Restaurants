@@ -1,0 +1,291 @@
+1. Revenue
+
+SELECT
+  sum(price) as Revenue
+FROM
+  order_details
+  RIGHT JOIN menu_items ON order_details.item_id = menu_items.menu_item_id
+WHERE
+  {{category}}
+  AND order_date BETWEEN {{from}} AND {{to}}
+  and {{items}}
+
+
+
+2. Orders
+
+SELECT
+ count(distinct(order_id)) as Order
+FROM
+  order_details
+  RIGHT JOIN menu_items ON order_details.item_id = menu_items.menu_item_id
+WHERE
+  {{category}}
+  AND order_date BETWEEN {{from}} AND {{to}} 
+
+
+
+3. Items (Done Using Metabase Question Features That's why the code is a bit strange)
+
+SELECT
+  count(distinct "public"."menu_items"."menu_item_id") AS "count"
+FROM
+  "public"."menu_items"
+WHERE
+  (
+    ("public"."menu_items"."category" = 'American')
+   
+    OR ("public"."menu_items"."category" = 'Asian')
+    OR ("public"."menu_items"."category" = 'Italian')
+    OR ("public"."menu_items"."category" = 'Mexican')
+  )
+ 
+   AND (
+    ("public"."menu_items"."category" = 'Mexican')
+    OR ("public"."menu_items"."category" = 'American')
+    OR ("public"."menu_items"."category" = 'Asian')
+    OR ("public"."menu_items"."category" = 'Italian')
+  )
+
+
+
+4. Avg Order Value
+
+WITH
+  order_saga AS (
+    SELECT
+      count(DISTINCT (order_id)) AS ordered
+    FROM
+      order_details
+      RIGHT JOIN menu_items ON order_details.item_id = menu_items.menu_item_id
+    WHERE
+      {{category}}
+      AND order_date BETWEEN {{from}} AND {{to}} 
+  ),
+  revenue_saga AS (
+    SELECT
+      sum(price) AS Revenue
+    FROM
+      order_details
+      RIGHT JOIN menu_items ON order_details.item_id = menu_items.menu_item_id
+    WHERE
+      {{category}}
+      AND order_date BETWEEN {{from}} AND {{to}} 
+  )
+SELECT
+  (revenue / ordered) AS Avg_order_value
+FROM
+  revenue_saga
+  CROSS JOIN order_saga
+
+
+5. Avg Items Per Order
+
+WITH
+  order_saga AS (
+    SELECT
+      count(DISTINCT (order_id)) AS ordered
+    FROM
+      order_details
+      RIGHT JOIN menu_items ON order_details.item_id = menu_items.menu_item_id
+    WHERE
+      {{category}}
+      AND order_date BETWEEN {{from}} AND {{to}}
+  ),
+  items_saga AS (
+    SELECT
+      cast(count(item_id) AS float) AS items
+    FROM
+      order_details
+      RIGHT JOIN menu_items ON order_details.item_id = menu_items.menu_item_id
+    WHERE
+      {{category}}
+      AND order_date BETWEEN {{from}} AND {{to}}
+  )
+SELECT
+  (items / ordered) AS avg_items_per_order
+FROM
+  items_saga
+  CROSS JOIN order_saga
+
+
+
+6. Weekly Trend
+
+
+SELECT
+  to_char(date_trunc('week', order_date), 'Mon DD') || '-' || to_char(
+    date_trunc('week', order_date) + interval '6 days',
+    'Mon DD'
+  ) AS week_label,
+  count(DISTINCT order_id) AS orders_count
+FROM
+  order_details
+  JOIN menu_items ON order_details.item_id = menu_items.menu_item_id
+WHERE
+  order_date BETWEEN {{From}} AND {{To}}
+  and {{category}}
+GROUP BY
+  date_trunc('week', order_date)
+ORDER BY
+  date_trunc('week', order_date);
+
+
+
+7. Monthly Trend
+
+
+SELECT
+  DATE_TRUNC('month', order_date)::date as month,
+  count(distinct(order_id)) as orders_count
+FROM
+  order_details
+  RIGHT JOIN menu_items ON order_details.item_id = menu_items.menu_item_id
+WHERE
+  {{category}}
+  AND order_date BETWEEN {{from}} AND {{to}}
+GROUP BY
+  DATE_TRUNC('month', order_date)
+ORDER BY
+  month
+
+
+
+8. Top 5 best-selling items by Quantity
+
+
+SELECT
+  menu_items.item_name,
+  COUNT(*) AS qty_sold
+FROM
+  order_details 
+  JOIN menu_items  ON order_details.item_id = menu_items.menu_item_id
+where {{category}} and order_date between {{from}} and {{to}}
+GROUP BY
+  menu_items.item_name
+ORDER BY
+  qty_sold DESC
+LIMIT
+  5;
+
+
+
+9. Revenue By Category 
+
+
+SELECT
+  menu_items.category,
+  SUM(menu_items.price)
+FROM
+  menu_items
+  JOIN order_details ON menu_items.menu_item_id = order_details.item_id
+WHERE
+  {{categories}}
+  AND order_date BETWEEN {{from}} AND {{to}}
+GROUP BY
+  menu_items.category
+ORDER BY
+  SUM(menu_items.price) DESC,
+  menu_items.category ASC;
+
+
+
+10. Top 5 best-selling items by Revenue
+
+
+SELECT
+  menu_items.item_name,
+  SUM(menu_items.price) AS total_rev
+FROM
+  order_details 
+  JOIN menu_items  ON order_details.item_id = menu_items.menu_item_id
+where {{category}} and order_date between {{from}} and {{to}}
+GROUP BY
+  menu_items.item_name
+ORDER BY
+  total_rev DESC
+LIMIT
+  5;
+
+
+
+11. Menu Items (Metabase Question feature is responsible, I am not. haha joking )
+
+
+SELECT
+  (
+    FLOOR((("public"."menu_items"."price" - 4.0) / 2.0)) * 2.0
+  ) + 4.0 AS "price",
+  COUNT(*) AS "count"
+FROM
+  "public"."menu_items"
+WHERE
+  (
+    ("public"."menu_items"."category" = 'American')
+   
+    OR ("public"."menu_items"."category" = 'Asian')
+    OR ("public"."menu_items"."category" = 'Italian')
+    OR ("public"."menu_items"."category" = 'Mexican')
+  )
+ 
+   AND (
+    ("public"."menu_items"."category" = 'Mexican')
+    OR ("public"."menu_items"."category" = 'American')
+    OR ("public"."menu_items"."category" = 'Asian')
+    OR ("public"."menu_items"."category" = 'Italian')
+  )
+GROUP BY
+  (
+    FLOOR((("public"."menu_items"."price" - 4.0) / 2.0)) * 2.0
+  ) + 4.0
+ORDER BY
+  (
+    FLOOR((("public"."menu_items"."price" - 4.0) / 2.0)) * 2.0
+  ) + 4.0 ASC
+
+
+
+
+12. Busiest Hours Of the Day (Order Wise)
+
+
+SELECT
+  to_char(date_trunc('hour', order_time), 'HH12 AM') AS hour_of_day,
+  count(DISTINCT order_id) AS orders_count
+FROM
+  order_details
+  JOIN menu_items ON order_details.item_id = menu_items.menu_item_id
+WHERE
+  order_date BETWEEN {{from}} AND {{to}}
+  AND {{Category}}
+GROUP BY
+  date_trunc('hour', order_time)
+ORDER BY
+  orders_count DESC
+LIMIT
+  5;
+
+
+
+13. Combo with Price
+
+
+SELECT
+  CONCAT(m1.item_name, ' + ', m2.item_name) AS combo,
+  (m1.price + m2.price) AS combined_price,
+  COUNT(*) AS combo_count
+FROM
+  order_details od1
+  JOIN order_details od2 ON od1.order_id = od2.order_id
+  AND od1.item_id < od2.item_id
+  JOIN menu_items m1 ON od1.item_id = m1.menu_item_id
+  JOIN menu_items m2 ON od2.item_id = m2.menu_item_id
+WHERE
+  od2.order_date BETWEEN {{from}} AND {{to}}
+GROUP BY
+  combo,
+  combined_price
+ORDER BY
+  combo_count DESC
+LIMIT
+  5;
